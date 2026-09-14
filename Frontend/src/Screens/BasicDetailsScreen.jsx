@@ -16,6 +16,8 @@ import { useNavigation } from '@react-navigation/native';
 import { countries } from '../data/countries';
 import { BASE_URL } from '@env';
 import { Calendar } from 'react-native-calendars';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export default function BasicDetailsScreen() {
   const navigation = useNavigation();
 

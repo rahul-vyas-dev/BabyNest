@@ -15,6 +15,8 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import {BASE_URL} from '@env';
 import {useDrawer} from '../context/DrawerContext';
 import {babySizes} from '../data/babySizes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Pressable } from 'react-native';
 
 export default function HomeScreen({navigation}) {
   const [dueDate, setDueDate] = useState('');
@@ -25,16 +27,36 @@ export default function HomeScreen({navigation}) {
   const [currentBabySize, setCurrentBabySize] = useState('');
   const weekScrollRef = useRef(null);
   const {openDrawer} = useDrawer();
+  const [profileImage, setProfileImage] = useState(null);
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  // This will fetch the selectes image, which is stored locally.
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      try {
+        const savedImage = await AsyncStorage.getItem('profile_image');
+
+        if (savedImage) {
+          setProfileImage(savedImage);
+        }
+      } catch (error) {
+        console.log('Error loading profile image:', error);
+      }
+    };
+    loadProfileImage();
+  });
+
   const fetchData = async () => {
     try {
-      const profileRes = await fetch(`${BASE_URL}/get_profile`);
+      const user_id = await AsyncStorage.getItem('user_id');
+      const profileRes = await fetch(
+        `${BASE_URL}/get_profile?user_id=${user_id}`,
+      );
       const profileData = await profileRes.json();
-      const fetchedDueDate = profileData?.due_date;
+      const fetchedDueDate = profileData?.dueDate;
 
       if (fetchedDueDate) {
         setDueDate(fetchedDueDate);
@@ -46,7 +68,9 @@ export default function HomeScreen({navigation}) {
         scrollToWeek(calculatedWeek);
       }
 
-      const apptRes = await fetch(`${BASE_URL}/get_appointments`);
+      const apptRes = await fetch(
+        `${BASE_URL}/get_appointments?user_id=${user_id}`,
+      );
       const apptData = await apptRes.json();
       setAllAppointments(apptData || []);
 
@@ -91,9 +115,9 @@ export default function HomeScreen({navigation}) {
   const filteredAppointments = allAppointments
     .map(appt => {
       const appointmentDate = new Date(appt.appointment_date);
-      const conceptionDate = new Date(dueDate);
-      conceptionDate.setDate(conceptionDate.getDate() - 280);
-      const diffInMs = appointmentDate - conceptionDate;
+      const pregnancyStartDate = new Date(dueDate);
+      pregnancyStartDate.setDate(pregnancyStartDate.getDate() - 280);
+      const diffInMs = appointmentDate - pregnancyStartDate;
       const weekNumber = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 7));
       return {...appt, week_number: weekNumber};
     })
@@ -123,7 +147,11 @@ export default function HomeScreen({navigation}) {
           <Text style={styles.appName}>BabyNest</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
             <Image
-              source={require('../assets/Avatar.jpeg')}
+              source={
+                profileImage
+                  ? {uri: profileImage}
+                  : require('../assets/Avatar.jpeg')
+              }
               style={styles.profileImage}
             />
           </TouchableOpacity>
@@ -186,7 +214,15 @@ export default function HomeScreen({navigation}) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
           {filteredAppointments.map((appt, idx) => (
-            <View key={idx} style={styles.card}>
+            <Pressable
+              key={idx}
+              style={styles.card}
+              onPress={() =>
+                navigation.jumpTo('Calendar', {
+                  appointment_date: appt.appointment_date,
+                  appointment_time: appt.appointment_time,
+                })
+              }>
               <Icon name="calendar" size={20} color="rgb(218,79,122)" />
               <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>{appt.title}</Text>
@@ -195,7 +231,7 @@ export default function HomeScreen({navigation}) {
                 </Text>
                 <Text>{appt.appointment_location}</Text>
               </View>
-            </View>
+            </Pressable>
           ))}
         </View>
 
@@ -222,7 +258,9 @@ export default function HomeScreen({navigation}) {
         </View>
 
         {/* Floating Button */}
-        <TouchableOpacity style={styles.floatingButton}>
+        <TouchableOpacity
+          style={styles.floatingButton}
+          onPress={() => navigation.jumpTo('Chat')}>
           <MaterialIcons name="smart-toy" size={24} color="#fff" />
         </TouchableOpacity>
       </ScrollView>
@@ -292,7 +330,7 @@ const styles = StyleSheet.create({
   floatingButton: {
     position: 'absolute',
     bottom: 30,
-    right: 30,
+    right: 20,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -300,5 +338,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
+    zIndex: 999,
   },
 });

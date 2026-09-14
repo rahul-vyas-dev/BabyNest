@@ -10,11 +10,14 @@ import {
   RefreshControl,
   SafeAreaView,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import Toast from 'react-native-toast-message';
 import {BASE_URL} from '@env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const colors = ['#FDE68A', '#BFDBFE', '#FECACA', '#D1FAE5'];
@@ -42,15 +45,17 @@ const generateWeekDates = startDate => {
   return weekDates;
 };
 
+const timeSlotHeight = 80;
+
 const changeDateFormat = date => {
   if (!date) return '';
   const [year, month, day] = date.split('-');
   return `${day} ${months[month - 1]}, ${year}`;
 };
 
-const ScheduleScreen = () => {
+const ScheduleScreen = ({route}) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scrollRef = useRef(null);
+  const [user_id, setUserId] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekDates, setWeekDates] = useState(generateWeekDates(new Date()));
   const [isCalendarVisible, setCalendarVisible] = useState(false);
@@ -62,6 +67,46 @@ const ScheduleScreen = () => {
     start: 8.0,
     end: 9.0,
   });
+  const scrollViewRef = useRef(null);
+  
+  useEffect(() => {
+    const getAppointmentY = time => {
+      return ((to_min(time) - 60) / 60) * timeSlotHeight;
+    };
+
+    const appointment_date = route.params?.appointment_date;
+    const appointment_time = route.params?.appointment_time;
+
+    if (appointment_time) {
+      const appointmentY = getAppointmentY(appointment_time);
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(0, appointmentY - 200),
+        animated: true,
+      });
+    }
+
+    setSelectedDate(appointment_date ? new Date(appointment_date) : new Date());
+    setWeekDates(
+      generateWeekDates(
+        appointment_date ? new Date(appointment_date) : new Date(),
+      ),
+    );
+
+    return () => {
+      setSelectedDate(new Date());
+      setWeekDates(generateWeekDates(new Date()));
+    };
+  }, [route.params?.appointment_date, route.params?.appointment_time]);
+
+  useEffect(() => {
+    const getUserId = async () => {
+      const id = await AsyncStorage.getItem('user_id');
+      setUserId(id);
+    };
+
+    getUserId();
+  }, []);
+
   const [appointments, setAppointments] = useState([]);
   const [newAppointment, setNewAppointment] = useState({
     title: '',
@@ -69,6 +114,7 @@ const ScheduleScreen = () => {
     appointment_date: '',
     appointment_time: '',
     appointment_location: '',
+    user_id: user_id,
   });
   const [refreshing, setRefreshing] = useState(false);
   const [isDateSelectorVisible, setDateSelectorVisible] = useState(false);
@@ -80,6 +126,7 @@ const ScheduleScreen = () => {
     appointment_date: '',
     appointment_time: '',
     appointment_location: '',
+    user_id: user_id,
   });
 
   useEffect(() => {
@@ -97,7 +144,9 @@ const ScheduleScreen = () => {
   const fetchAppointments = async () => {
     try {
       setRefreshing(true);
-      const response = await fetch(`${BASE_URL}/get_appointments`);
+      const response = await fetch(
+        `${BASE_URL}/get_appointments?user_id=${user_id}`,
+      );
       const data = await response.json();
 
       if (JSON.stringify(data) !== JSON.stringify(appointments)) {
@@ -148,6 +197,10 @@ const ScheduleScreen = () => {
 
   const addAppointment = async () => {
     try {
+      setNewAppointment(prevState => ({
+        ...prevState,
+        user_id: user_id,
+      }));
       const response = await fetch(`${BASE_URL}/add_appointment`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -155,31 +208,34 @@ const ScheduleScreen = () => {
       });
 
       const data = await response.json();
+      closeModals();
+      setAddAppointmentModalVisible(false);
       if (response.ok) {
-        closeModals();
         console.log('Success', 'Appointment created successfully!');
-        setAddAppointmentModalVisible(false);
         setNewAppointment({
           title: '',
           content: '',
           appointment_date: '',
           appointment_time: '',
           appointment_location: '',
+          user_id: user_id,
         });
         fetchAppointments();
 
         Toast.show({
           type: 'success',
           text1: 'Appointment added successfully!',
-          visibilityTime: 1000,
+          visibilityTime: 2000,
           position: 'bottom',
+          topOffset: 50,
         });
       } else {
         Toast.show({
           type: 'error',
           text1: data.error || 'Something went wrong!',
-          visibilityTime: 1000,
+          visibilityTime: 2000,
           position: 'bottom',
+          topOffset: 50,
         });
         console.log('Error', data.error || 'Something went wrong!');
       }
@@ -187,8 +243,9 @@ const ScheduleScreen = () => {
       Toast.show({
         type: 'error',
         text1: 'Error adding appointment!',
-        visibilityTime: 1000,
+        visibilityTime: 2000,
         position: 'bottom',
+        topOffset: 50,
       });
       console.error('Error adding appointment:', error);
     }
@@ -196,24 +253,29 @@ const ScheduleScreen = () => {
 
   const handleDeleteAppointment = async id => {
     try {
-      const response = await fetch(`${BASE_URL}/delete_appointment/${id}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `${BASE_URL}/delete_appointment/${id}/${user_id}`,
+        {
+          method: 'DELETE',
+        },
+      );
       const data = await response.json();
       if (response.ok) {
         Toast.show({
           type: 'success',
           text1: 'Appointment deleted successfully!',
-          visibilityTime: 1000,
+          visibilityTime: 2000,
           position: 'bottom',
+          topOffset: 50,
         });
         fetchAppointments();
       } else {
         Toast.show({
           type: 'error',
           text1: data.error || 'Something went wrong!',
-          visibilityTime: 1000,
+          visibilityTime: 2000,
           position: 'bottom',
+          topOffset: 50,
         });
         console.log('Error', data.error || 'Something went wrong!');
       }
@@ -221,8 +283,9 @@ const ScheduleScreen = () => {
       Toast.show({
         type: 'error',
         text1: 'Error deleting appointment!',
-        visibilityTime: 1000,
+        visibilityTime: 2000,
         position: 'bottom',
+        topOffset: 50,
       });
       console.error('Error deleting appointment:', error);
     } finally {
@@ -250,16 +313,18 @@ const ScheduleScreen = () => {
         Toast.show({
           type: 'success',
           text1: 'Appointment updated successfully!',
-          visibilityTime: 1000,
+          visibilityTime: 2000,
           position: 'bottom',
+          topOffset: 50,
         });
         fetchAppointments();
       } else {
         Toast.show({
           type: 'error',
           text1: data.error || 'Something went wrong!',
-          visibilityTime: 1000,
+          visibilityTime: 2000,
           position: 'bottom',
+          topOffset: 50,
         });
         console.log('Error', data.error || 'Something went wrong!');
       }
@@ -267,8 +332,9 @@ const ScheduleScreen = () => {
       Toast.show({
         type: 'error',
         text1: 'Error updating appointment!',
-        visibilityTime: 1000,
+        visibilityTime: 2000,
         position: 'bottom',
+        topOffset: 50,
       });
       console.error('Error updating appointment:', error);
     } finally {
@@ -279,6 +345,7 @@ const ScheduleScreen = () => {
         appointment_date: '',
         appointment_time: '',
         appointment_location: '',
+        user_id: user_id,
       });
     }
   };
@@ -301,6 +368,7 @@ const ScheduleScreen = () => {
       appointment_date: '',
       appointment_time: '',
       appointment_location: '',
+      user_id: user_id,
     });
   };
 
@@ -317,6 +385,7 @@ const ScheduleScreen = () => {
       appointment_date: '',
       appointment_time: '',
       appointment_location: '',
+      user_id: user_id,
     });
   };
 
@@ -328,8 +397,6 @@ const ScheduleScreen = () => {
     selected.setHours(0, 0, 0, 0);
     return apptDate.getTime() === selected.getTime();
   });
-
-  const timeSlotHeight = 80;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -392,15 +459,16 @@ const ScheduleScreen = () => {
 
       <ScrollView
         style={styles.scheduleContainer}
+        ref={scrollViewRef}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }>
         <View style={styles.scheduleList}>
-          {Array.from({length: 13}, (_, i) => 8 + i).map(hour => (
+          {Array.from({length: 24}, (_, i) => 1 + i).map(hour => (
             <View
               key={hour}
               style={[styles.scheduleItem, {height: timeSlotHeight}]}>
-              <Text style={styles.timeText}>{hour}:00</Text>
+              <Text style={styles.timeText}>{hour == 24 ? '00' : hour}:00</Text>
               <View style={styles.scheduleLine} />
             </View>
           ))}
@@ -409,10 +477,11 @@ const ScheduleScreen = () => {
         {filteredAppointments.map((appt, index) => (
           <View
             key={appt.id}
+            id={`${appt.time}`}
             style={{
               ...styles.appointment,
               backgroundColor: colors[index % colors.length],
-              top: to_min(appt.appointment_time) - 370,
+              top: ((to_min(appt.appointment_time) - 60) / 60) * timeSlotHeight,
               zIndex: 1,
             }}>
             <TouchableOpacity onPress={() => handleAppointment(appt)}>
@@ -425,10 +494,13 @@ const ScheduleScreen = () => {
 
       <Modal
         visible={isAddAppointmentModalVisible}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={hideAddAppointmentModal}>
-        <View style={styles.overlay}>
+        <KeyboardAvoidingView
+          style={styles.overlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
           <View style={styles.modalContent}>
             {/* Close Button */}
             <TouchableOpacity
@@ -438,7 +510,7 @@ const ScheduleScreen = () => {
               <Icon name="close" size={18} color="#E91E63" />
             </TouchableOpacity>
 
-            {/* Decorative top (emoji removed for cleaner UI) */}
+            {/* Decorative Top */}
             <View style={styles.iconContainer}>
               <View style={styles.topBadge} />
               <View style={styles.sparkle} />
@@ -446,15 +518,19 @@ const ScheduleScreen = () => {
 
             {/* Header */}
             <Text style={styles.title}>Add an Appointment</Text>
+
             <Text style={styles.subtitle}>
               Fill in the details below to schedule your appointment
             </Text>
 
-            {/* Form Inputs */}
             <ScrollView
               style={styles.formContainer}
-              showsVerticalScrollIndicator={false}>
-              {/* Title Input */}
+              contentContainerStyle={styles.formContent}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              nestedScrollEnabled>
+              {/* Title */}
               <View style={styles.inputWrapper}>
                 <TextInput
                   placeholder="Appointment title"
@@ -462,12 +538,16 @@ const ScheduleScreen = () => {
                   style={styles.input}
                   value={newAppointment.title}
                   onChangeText={text =>
-                    setNewAppointment({...newAppointment, title: text})
+                    setNewAppointment({
+                      ...newAppointment,
+                      title: text,
+                    })
                   }
+                  returnKeyType="next"
                 />
               </View>
 
-              {/* Description Input */}
+              {/* Description */}
               <View style={styles.inputWrapper}>
                 <TextInput
                   placeholder="Description"
@@ -475,40 +555,48 @@ const ScheduleScreen = () => {
                   style={[styles.input, styles.descriptionInput]}
                   value={newAppointment.content}
                   onChangeText={text =>
-                    setNewAppointment({...newAppointment, content: text})
+                    setNewAppointment({
+                      ...newAppointment,
+                      content: text,
+                    })
                   }
                   multiline
-                  numberOfLines={3}
+                  numberOfLines={4}
+                  textAlignVertical="top"
                 />
               </View>
 
-              {/* Date Input */}
+              {/* Date */}
               <TouchableOpacity
-                style={styles.inputWrapper}
-                onPress={showCalendar}>
+                activeOpacity={0.8}
+                onPress={showCalendar}
+                style={styles.inputWrapper}>
                 <TextInput
                   placeholder="Select date"
                   placeholderTextColor="#999"
                   style={styles.input}
                   editable={false}
+                  pointerEvents="none"
                   value={newAppointment.appointment_date}
                 />
               </TouchableOpacity>
 
-              {/* Time Input */}
+              {/* Time */}
               <TouchableOpacity
-                style={styles.inputWrapper}
-                onPress={showCalendar}>
+                activeOpacity={0.8}
+                onPress={showCalendar}
+                style={styles.inputWrapper}>
                 <TextInput
                   placeholder="Select time"
                   placeholderTextColor="#999"
                   style={styles.input}
                   editable={false}
+                  pointerEvents="none"
                   value={newAppointment.appointment_time}
                 />
               </TouchableOpacity>
 
-              {/* Location Input */}
+              {/* Location */}
               <View style={styles.inputWrapper}>
                 <TextInput
                   placeholder="Location"
@@ -521,28 +609,34 @@ const ScheduleScreen = () => {
                       appointment_location: text,
                     })
                   }
+                  returnKeyType="done"
                 />
               </View>
+
+              {/* Extra bottom space so last field can scroll above keyboard */}
+              <View style={{height: 20}} />
             </ScrollView>
 
-            {/* Action Buttons */}
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[styles.button, styles.saveButton]}
-                onPress={addAppointment}>
+                onPress={addAppointment}
+                activeOpacity={0.8}>
                 <Text style={styles.saveButtonText}>Save Appointment</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.button, styles.cancelButton]}
-                onPress={hideAddAppointmentModal}>
+                onPress={hideAddAppointmentModal}
+                activeOpacity={0.8}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Decorative Element */}
+            {/* Decorative Bottom */}
             <View style={styles.decorativeBottom} />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <View style={{zIndex: 9999, elevation: 10}}>
@@ -570,39 +664,106 @@ const ScheduleScreen = () => {
         onRequestClose={() => setModalOpen(false)}>
         <View style={styles.overlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>{selectedAppointment.title}</Text>
-            <Text style={styles.modalContent}>
-              {selectedAppointment.content}
-            </Text>
-            <Text style={styles.modalDate}>
-              {changeDateFormat(selectedAppointment.appointment_date)}
-            </Text>
-            <Text>{selectedAppointment.time}</Text>
-            <Text style={styles.modalLocation}>
-              {selectedAppointment.appointment_location}
-            </Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                gap: 10,
-                justifyContent: 'flex-end',
-                marginTop: 10,
-              }}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle} numberOfLines={2}>
+                {selectedAppointment.title}
+              </Text>
+
               <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setModalOpen(false)}
+                activeOpacity={0.7}>
+                <Icon name="close" size={18} color="#E91E63" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Description */}
+            <View style={styles.descriptionContainer}>
+              <Text style={styles.descriptionLabel}>Description</Text>
+
+              <Text style={styles.modalContentdesc}>
+                {selectedAppointment.content}
+              </Text>
+            </View>
+
+            {/* Appointment Information */}
+            <View style={styles.infoContainer}>
+              {/* Date */}
+              <View style={styles.infoRow}>
+                <View style={styles.infoIcon}>
+                  <Icon name="calendar-outline" size={18} color="#E91E63" />
+                </View>
+
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoLabel}>Date</Text>
+
+                  <Text style={styles.modalDate}>
+                    {changeDateFormat(selectedAppointment.appointment_date)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Time */}
+              <View style={styles.infoRow}>
+                <View style={styles.infoIcon}>
+                  <Icon name="time-outline" size={18} color="#E91E63" />
+                </View>
+
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoLabel}>Time</Text>
+
+                  <Text style={styles.modalTime}>
+                    {selectedAppointment.appointment_time}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Location */}
+              <View style={styles.infoRow}>
+                <View style={styles.infoIcon}>
+                  <Icon name="location-outline" size={18} color="#E91E63" />
+                </View>
+
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoLabel}>Location</Text>
+
+                  <Text style={styles.modalLocation}>
+                    {selectedAppointment.appointment_location}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.editButton}
+                activeOpacity={0.8}
                 onPress={() => {
                   setModalOpen(false);
                   handleEditAppointment(selectedAppointment);
                 }}>
-                <Text style={styles.modalSaveButton}>Edit</Text>
+                <Icon name="create-outline" size={18} color="#E91E63" />
+
+                <Text style={styles.editButtonText}>Edit</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
+                style={styles.deleteButton}
+                activeOpacity={0.8}
                 onPress={() => {
                   handleDeleteAppointment(selectedAppointment.id);
                   setModalOpen(false);
                 }}>
-                <Text style={styles.modalCancelButton}>Delete</Text>
+                <Icon name="trash-outline" size={18} color="#fff" />
+
+                <Text style={styles.deleteButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Bottom decoration */}
+            <View style={styles.modalBottomLine} />
           </View>
         </View>
       </Modal>
@@ -781,18 +942,147 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   modal: {
+    width: '100%',
     backgroundColor: '#fff',
-    padding: 20,
-    width: '80%',
-    alignSelf: 'center',
-    borderRadius: 10,
-    elevation: 5,
+    borderRadius: 28,
+    paddingHorizontal: 18,
+    paddingTop: 24,
+    paddingBottom: 26,
+    elevation: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -5,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 15,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+
+    marginBottom: 20,
+    paddingRight: 4,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'black',
-    marginBottom: 10,
+    fontSize: 25,
+    fontWeight: '800',
+    color: '#000',
+    lineHeight: 31,
+    paddingRight: 15,
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  descriptionContainer: {
+    backgroundColor: '#fafafa',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 18,
+  },
+  descriptionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#999',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 7,
+  },
+  modalContentdesc: {
+    fontSize: 15,
+    color: '#333',
+    lineHeight: 22,
+  },
+  infoContainer: {
+    marginBottom: 22,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  infoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FCE4EC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 13,
+  },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 2,
+    fontWeight: '600',
+  },
+  modalDate: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '600',
+  },
+  modalTime: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '600',
+  },
+  modalLocation: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  deleteButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 14,
+    backgroundColor: '#E91E63',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  editButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#F8BBD0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  editButtonText: {
+    color: '#E91E63',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalBottomLine: {
+    height: 3,
+    borderRadius: 50,
+    backgroundColor: '#F8BBD0',
+    marginTop: 22,
   },
   modalApp: {
     color: '#333',
@@ -802,18 +1092,18 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   modalSaveButton: {
-    // backgroundColor: '#ff4081',
-    // backgroundColor: '#fff0f6',
+    backgroundColor: 'gray',
+    padding: 10,
     borderRadius: 5,
     color: 'white',
     textAlign: 'center',
     marginTop: 10,
   },
   modalCancelButton: {
-    backgroundColor: 'white',
+    backgroundColor: '#ff4081',
     padding: 10,
     borderRadius: 5,
-    color: 'gray',
+    color: 'white',
     textAlign: 'center',
     marginTop: 10,
   },
@@ -827,17 +1117,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 24,
     width: '100%',
     maxWidth: 400,
-    maxHeight: '90%',
+    maxHeight: '95%',
+    flexShrink: 1,
+    borderRadius: 24,
+    padding: 24,
+
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 10},
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
     shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 10,
@@ -846,11 +1142,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+
     justifyContent: 'center',
     alignItems: 'center',
+
     backgroundColor: '#f5f5f5',
     zIndex: 10,
   },
@@ -861,8 +1160,8 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 16,
+    marginBottom: 14,
+    marginTop: 4,
   },
   decorativeIcon: {
     fontSize: 48,
@@ -886,7 +1185,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     // color: '#E91E63',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
     letterSpacing: -0.5,
   },
@@ -894,31 +1193,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9E3A57',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
     lineHeight: 20,
   },
   formContainer: {
-    marginBottom: 20,
+    flexGrow: 0,
+    flexShrink: 1,
+    width: '100%',
+  },
+  formContentContainer: {
+    paddingTop: 2,
+    paddingBottom: 10,
   },
   inputWrapper: {
-    marginBottom: 16,
-    position: 'relative',
+    marginBottom: 14,
+    width: '100%',
   },
   input: {
     borderWidth: 1.5,
     borderColor: '#e0e0e0',
     borderRadius: 14,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 13,
+    minHeight: 50,
     fontSize: 15,
     color: '#000',
-    // backgroundColor: '#E91E63',
-    padding: 10,
-    borderRadius: 5,
-
-    textAlign: 'center',
-    marginTop: 10,
-    textAlignVertical: 'top',
+    backgroundColor: '#fff',
+  },
+  descriptionInput: {
+    minHeight: 100,
+    paddingTop: 14,
   },
   backgroundColor: '#fff',
   padding: 10,
@@ -928,8 +1232,8 @@ const styles = StyleSheet.create({
   textAlign: 'center',
   marginTop: 10,
   buttonContainer: {
-    // backgroundColor: '#E91E63',
-    gap: 12,
+    gap: 10,
+    marginTop: 4,
   },
   button: {
     paddingVertical: 14,
@@ -958,12 +1262,12 @@ const styles = StyleSheet.create({
   },
   decorativeBottom: {
     position: 'absolute',
-    bottom: -20,
-    right: -20,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(233, 30, 99, 0.06)',
+    bottom: 0,
+    left: 24,
+    right: 24,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#F8BBD0',
   },
 });
 

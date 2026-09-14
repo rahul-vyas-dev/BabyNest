@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, {useRef, useState} from 'react';
 import {
   Animated,
   View,
@@ -12,10 +12,12 @@ import { DrawerContext } from '../context/DrawerContext';
 import { useNavigation, CommonActions, useNavigationState } from '@react-navigation/native';
 import { BASE_URL } from '@env';
 import Icon from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 const DRAWER_WIDTH = 260;
 
-export default function CustomDrawer({ children }) {
+export default function CustomDrawer({children}) {
   const navigation = useNavigation();
   const currentRouteName = useNavigationState(state => {
     if (!state) return 'Home';
@@ -54,7 +56,7 @@ export default function CustomDrawer({ children }) {
     });
   };
 
-  const closeDrawer = (cb) => {
+  const closeDrawer = cb => {
     if (isAnimatingRef.current) return;
 
     isAnimatingRef.current = true;
@@ -71,7 +73,7 @@ export default function CustomDrawer({ children }) {
         duration: 200,
         useNativeDriver: true,
       }),
-    ]).start(({ finished }) => {
+    ]).start(({finished}) => {
       isAnimatingRef.current = false;
       if (!finished) return;
 
@@ -80,10 +82,10 @@ export default function CustomDrawer({ children }) {
     });
   };
 
-  const navigateTo = (screen) => {
+  const navigateTo = screen => {
     closeDrawer(() => {
       if (screen === 'Home') {
-        navigation.navigate('MainTabs', { screen: 'Home' });
+        navigation.navigate('MainTabs', {screen: 'Home'});
       } else {
         navigation.navigate(screen);
       }
@@ -94,22 +96,32 @@ export default function CustomDrawer({ children }) {
     if (isAnimatingRef.current) return;
 
     try {
-      const res = await fetch(`${BASE_URL}/delete_profile`, {
+      const user_id = await AsyncStorage.getItem('user_id');
+      const res = await fetch(`${BASE_URL}/delete_profile?user_id=${user_id}`, {
         method: 'DELETE',
       });
       const data = await res.json();
 
       if (data?.error) {
         Alert.alert('Logout Failed', data.error);
+        Toast.show({
+          type: 'error',
+          text1: data.error || 'Enable to Logout',
+          visibilityTime: 2000,
+          position: 'bottom',
+          topOffset: 50,
+        });
         return;
       }
 
       closeDrawer(() => {
+        AsyncStorage.removeItem(user_id);
+        AsyncStorage.clear();
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
-            routes: [{ name: 'Onboarding' }],
-          })
+            routes: [{name: 'Onboarding'}],
+          }),
         );
       });
     } catch {
@@ -118,22 +130,14 @@ export default function CustomDrawer({ children }) {
   };
 
   return (
-    <DrawerContext.Provider value={{ openDrawer, closeDrawer }}>
-      <View style={{ flex: 1 }}>
+    <DrawerContext.Provider value={{openDrawer, closeDrawer}}>
+      <View style={{flex: 1}}>
+        {/* Main Content */}
+        <View style={{flex: 1}}>{children}</View>
 
-          {/* Main Content */}
-        <View style={{ flex: 1 }}>
-          {children}
-          </View>
-          
-          {/*BackDrop*/}
+        {/*BackDrop*/}
         {isDrawerOpen && (
-          <Animated.View 
-            style={[
-              styles.backdrop,
-              { opacity: backdropOpacity }
-            ]}
-          >
+          <Animated.View style={[styles.backdrop, {opacity: backdropOpacity}]}>
             <TouchableOpacity
               activeOpacity={1}
               onPress={() => closeDrawer()}
@@ -142,9 +146,8 @@ export default function CustomDrawer({ children }) {
           </Animated.View>
         )}
 
-          {/* Animated Drawer Panel */}
-        <Animated.View style={[styles.drawer, { transform: [{ translateX }] }]}>
-          
+        {/* Animated Drawer Panel */}
+        <Animated.View style={[styles.drawer, {transform: [{translateX}]}]}>
           <View style={styles.drawerTopHeader}>
             <Text style={styles.drawerHeader}>BabyNest</Text>
             <TouchableOpacity onPress={() => closeDrawer()}>
@@ -155,22 +158,34 @@ export default function CustomDrawer({ children }) {
            <TouchableOpacity onPress={() => navigateTo('Home')} style={styles.link}>
             <Text style={{ color: currentRouteName === 'Home' ? '#ff4081' : 'black' }}>Home</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigateTo('AllTasks')} style={styles.link}>
+          <TouchableOpacity
+            onPress={() => navigateTo('AllTasks')}
+            style={styles.link}>
             <Text>Tasks & AI Recommendations</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigateTo('Weight')} style={styles.link}>
+          <TouchableOpacity
+            onPress={() => navigateTo('Weight')}
+            style={styles.link}>
             <Text>Weight Tracking</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigateTo('Medicine')} style={styles.link}>
+          <TouchableOpacity
+            onPress={() => navigateTo('Medicine')}
+            style={styles.link}>
             <Text>Medicine Tracking</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigateTo('Symptoms')} style={styles.link}>
+          <TouchableOpacity
+            onPress={() => navigateTo('Symptoms')}
+            style={styles.link}>
             <Text>Symptoms Tracking</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigateTo('BloodPressure')} style={styles.link}>
+          <TouchableOpacity
+            onPress={() => navigateTo('BloodPressure')}
+            style={styles.link}>
             <Text>Blood Pressure Tracking</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigateTo('Discharge')} style={styles.link}>
+          <TouchableOpacity
+            onPress={() => navigateTo('Discharge')}
+            style={styles.link}>
             <Text>Discharge Tracking</Text>
           </TouchableOpacity>
 
@@ -205,16 +220,16 @@ const styles = StyleSheet.create({
   },
 
   drawerTopHeader: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
 
   drawerHeader: {
-  fontSize: 22,
-  fontWeight: 'bold',
-  color: 'rgb(218,79,122)',
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'rgb(218,79,122)',
   },
 
   link: {
