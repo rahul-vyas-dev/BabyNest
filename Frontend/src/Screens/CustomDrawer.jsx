@@ -14,6 +14,7 @@ import { BASE_URL } from '@env';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
+import { deleteProfile } from '../storage/profile';
 
 const DRAWER_WIDTH = 260;
 
@@ -97,16 +98,13 @@ export default function CustomDrawer({children}) {
 
     try {
       const user_id = await AsyncStorage.getItem('user_id');
-      const res = await fetch(`${BASE_URL}/delete_profile?user_id=${user_id}`, {
-        method: 'DELETE',
-      });
-      const data = await res.json();
+      const delete_user_res = await deleteProfile(user_id);
 
-      if (data?.error) {
-        Alert.alert('Logout Failed', data.error);
+      if (!delete_user_res.success) {
+        Alert.alert('Logout Failed', delete_user_res.error.message);
         Toast.show({
           type: 'error',
-          text1: data.error || 'Enable to Logout',
+          text1: delete_user_res.error.message || 'Enable to Logout',
           visibilityTime: 2000,
           position: 'bottom',
           topOffset: 50,

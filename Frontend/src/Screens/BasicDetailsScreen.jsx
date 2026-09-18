@@ -17,6 +17,7 @@ import { countries } from '../data/countries';
 import { BASE_URL } from '@env';
 import { Calendar } from 'react-native-calendars';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createProfile } from '../storage/profile';
 
 export default function BasicDetailsScreen() {
   const navigation = useNavigation();
@@ -76,27 +77,21 @@ export default function BasicDetailsScreen() {
     if (Object.keys(newErrors).length > 0) return;
     try {
       setIsLoading(true);
-    const res = await fetch(`${BASE_URL}/set_profile`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      const data = await createProfile({
         location: country,
         lmp: lmpDate,
         cycleLength: Number(cycleLength),
         periodLength: Number(periodLength),
         age: Number(age),
         weight: Number(weight),
-      }),
-    });
+      })
 
-    const data = await res.json();
-
-    if (data.error) {
-      setErrors({ form: data.error });
+    if (!data.success) {
+      setErrors({ form: data.error.message });
     } else {
       setErrors({});
       // Store user_id in AsyncStorage
-      await AsyncStorage.setItem('user_id', String(data.user_id));
+      await AsyncStorage.setItem('user_id', String(data.data.userId));
       // Navigate to DueDate screen with the due date
       navigation.replace('DueDate', { dueDate: data.dueDate });
     }

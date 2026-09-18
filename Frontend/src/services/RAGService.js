@@ -6,6 +6,7 @@
 
 import {BASE_URL} from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { deleteProfile, updateProfile } from '../storage/profile';
 
 class RAGService {
   constructor() {
@@ -2315,15 +2316,10 @@ class RAGService {
    */
   async updateProfile(data, userContext) {
     try {
-      const response = await fetch(`${BASE_URL}/update_profile`, {
-        method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          [data.field]: data.value,
-        }),
-      });
+      const user_id = await AsyncStorage.getItem('user_id');
+      const updated_data_res = await updateProfile(user_id, data.value);
 
-      if (response.ok) {
+      if (updated_data_res.success) {
         return {
           success: true,
           message: `👤 Profile updated successfully! ${data.field} set to ${data.value}`,
@@ -2774,19 +2770,21 @@ class RAGService {
    */
   async logout(data, userContext) {
     try {
-      const response = await fetch(`${BASE_URL}/delete_profile`, {
-        method: 'DELETE',
-      });
+      const user_id = await AsyncStorage.getItem('user_id');
+      const delete_user_res = await deleteProfile(user_id);
 
-      return {
-        success: true,
-        message: `👋 Logging out... Goodbye!`,
-        action: 'logout',
-      };
+      if (delete_user_res.success) {
+        return {
+          success: true,
+          message: `👋 Logging out... Goodbye!`,
+          action: 'logout',
+        };
+      }
+      throw new Error(delete_user_res.error.message)
     } catch (error) {
       return {
-        success: true,
-        message: `👋 Logging out... Goodbye!`,
+        success: false,
+        message: error,
         action: 'logout',
       };
     }

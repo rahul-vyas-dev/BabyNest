@@ -17,6 +17,7 @@ import {useDrawer} from '../context/DrawerContext';
 import {babySizes} from '../data/babySizes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable } from 'react-native';
+import { getProfile } from '../storage/profile';
 
 export default function HomeScreen({navigation}) {
   const [dueDate, setDueDate] = useState('');
@@ -52,10 +53,8 @@ export default function HomeScreen({navigation}) {
   const fetchData = async () => {
     try {
       const user_id = await AsyncStorage.getItem('user_id');
-      const profileRes = await fetch(
-        `${BASE_URL}/get_profile?user_id=${user_id}`,
-      );
-      const profileData = await profileRes.json();
+      const getProfileData = await getProfile(user_id);
+      const profileData = getProfileData.data;
       const fetchedDueDate = profileData?.dueDate;
 
       if (fetchedDueDate) {
