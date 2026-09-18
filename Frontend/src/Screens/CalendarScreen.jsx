@@ -18,6 +18,7 @@ import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import Toast from 'react-native-toast-message';
 import {BASE_URL} from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NotificationService from '../services/NotificationService';
 
 const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const colors = ['#FDE68A', '#BFDBFE', '#FECACA', '#D1FAE5'];
@@ -229,6 +230,24 @@ const ScheduleScreen = ({route}) => {
           position: 'bottom',
           topOffset: 50,
         });
+        
+        // Notifications
+        NotificationService.showLocalNotification(
+          "Appointment Created",
+          `"${newAppointment.title}" scheduled for ${newAppointment.appointment_date} at ${newAppointment.appointment_time}.`
+        );
+
+        if (data && data.id) {
+        NotificationService.scheduleAppointmentReminder(
+          newAppointment.title,
+          newAppointment.content,
+          newAppointment.appointment_date,
+          newAppointment.appointment_time,
+          data.id
+        );
+      } else {
+        console.warn('[useCalendar] No ID returned from backend, skipping reminder schedule.');
+      }
       } else {
         Toast.show({
           type: 'error',
@@ -269,6 +288,11 @@ const ScheduleScreen = ({route}) => {
           topOffset: 50,
         });
         fetchAppointments();
+        NotificationService.showLocalNotification(
+          "Appointment Deleted", 
+          `"${selectedAppointment?.title || 'Appointment'}" has been cancelled.`
+        );
+        NotificationService.cancelNotification(id);
       } else {
         Toast.show({
           type: 'error',
@@ -317,7 +341,21 @@ const ScheduleScreen = ({route}) => {
           position: 'bottom',
           topOffset: 50,
         });
-        fetchAppointments();
+        const fetchSuccess = fetchAppointments();
+        if (fetchSuccess) {
+          NotificationService.showLocalNotification(
+            "Appointment Updated", 
+            `"${editAppointment.title}" rescheduled to ${editAppointment.appointment_date} at ${editAppointment.appointment_time}.`
+          );
+          NotificationService.cancelNotification(editAppointment.id);
+          NotificationService.scheduleAppointmentReminder(
+              editAppointment.title, 
+              editAppointment.content, 
+              editAppointment.appointment_date, 
+              editAppointment.appointment_time, 
+              editAppointment.id
+          );
+      }
       } else {
         Toast.show({
           type: 'error',
