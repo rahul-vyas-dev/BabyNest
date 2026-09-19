@@ -7,6 +7,7 @@
 import {BASE_URL} from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteProfile, updateProfile } from '../storage/profile';
+import { addAppointment, deleteAppointment, getAppointments, updateAppointment } from '../storage/appointments';
 
 class RAGService {
   constructor() {
@@ -2015,24 +2016,27 @@ class RAGService {
       // Convert natural language dates and times to proper formats
       const properDate = this.convertToDate(data.date);
       const properTime = this.convertToTime(data.time);
-
+      
       console.log('📅 Converting appointment data:');
       console.log('Original date:', data.date, '→ Proper date:', properDate);
       console.log('Original time:', data.time, '→ Proper time:', properTime);
-
-      const response = await fetch(`${BASE_URL}/add_appointment`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
+      
+      const user_id = await AsyncStorage.getItem("user_id");
+      const add_appointment_res = await addAppointment({
           title: data.title || 'Appointment',
           content: `Appointment scheduled via chat`,
           appointment_date: properDate,
           appointment_time: properTime,
           appointment_location: data.location || 'TBD',
-        }),
-      });
+          user_id
+        });
 
-      if (response.ok) {
+      if (!add_appointment_res.success) {
+        throw new Error(add_appointment_res.error.message);
+      }
+
+      const data = add_appointment_res.data;
+      if (add_appointment_res.success) {
         return {
           success: true,
           message: `📅 Appointment "${
@@ -2346,7 +2350,7 @@ class RAGService {
       let endpoint = '';
       switch (data.type) {
         case 'appointments':
-          endpoint = `/get_appointments?user_id=${user_id}`;
+          endpoint = getAppointments;
           break;
         case 'weight':
           endpoint = '/get_weight';
@@ -2370,9 +2374,9 @@ class RAGService {
           throw new Error('Unknown data type');
       }
 
-      const response = await fetch(`${BASE_URL}${endpoint}`);
-      if (response.ok) {
-        const result = await response.json();
+      const response = await endpoint(user_id);
+      if (response.success) {
+        const result = response.data;      
 
         // Format the data for display
         let formattedMessage = '';
@@ -2450,7 +2454,7 @@ class RAGService {
           data: result,
         };
       } else {
-        throw new Error('Failed to fetch data');
+        throw new Error(appointments_response.error.message);
       }
     } catch (error) {
       return {
@@ -2465,13 +2469,15 @@ class RAGService {
    */
   async updateAppointment(data, userContext) {
     try {
-      // First, get all appointments to find the one to update
-      const appointmentsResponse = await fetch(`${BASE_URL}/get_appointments`);
-      if (!appointmentsResponse.ok) {
-        throw new Error('Failed to fetch appointments');
-      }
+      const user_id = await AsyncStorage.getItem('user_id');
 
-      const appointments = await appointmentsResponse.json();
+      // First, get all appointments to find the one to update
+      const appointments_response = await getAppointments(user_id);
+      if (!appointments_response.success) {
+        throw new Error(appointments_response.error.message);
+      }
+      
+      const appointments = appointments_response.data;
       const matchingAppointments = this.findMatchingAppointments(
         appointments,
         data.appointment_identifier,
@@ -2520,22 +2526,15 @@ class RAGService {
         content: data.note || appointmentToUpdate.content,
       };
 
-      const response = await fetch(
-        `${BASE_URL}/update_appointment/${appointmentToUpdate.id}`,
-        {
-          method: 'PATCH',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(updateData),
-        },
-      );
+      const update_appointment_res = await updateAppointment(appointmentToUpdate.id, updateData);
 
-      if (response.ok) {
+      if (update_appointment_res.success) {
         return {
           success: true,
           message: `✅ Appointment "${updateData.title}" updated successfully!\n\n📅 Date: ${updateData.appointment_date}\n⏰ Time: ${updateData.appointment_time}\n📍 Location: ${updateData.appointment_location}`,
         };
       } else {
-        throw new Error('Failed to update appointment');
+        throw new Error(update_appointment_res.error.message);
       }
     } catch (error) {
       return {
@@ -2550,13 +2549,15 @@ class RAGService {
    */
   async deleteAppointment(data, userContext) {
     try {
+      const user_id = await AsyncStorage.getItem('user_id');
+
       // First, get all appointments to find the one to delete
-      const appointmentsResponse = await fetch(`${BASE_URL}/get_appointments`);
-      if (!appointmentsResponse.ok) {
-        throw new Error('Failed to fetch appointments');
+      const appointments_response = await getAppointments(user_id);
+      if (!appointments_response.success) {
+        throw new Error(appointments_response.error.message);
       }
 
-      const appointments = await appointmentsResponse.json();
+      const appointments = appointments_response.data;
       const matchingAppointments = this.findMatchingAppointments(
         appointments,
         data.appointment_identifier,
@@ -2601,21 +2602,15 @@ class RAGService {
       // Single match - proceed with deletion
       const appointmentToDelete = matchingAppointments[0];
 
-      const response = await fetch(
-        `${BASE_URL}/delete_appointment/${appointmentToDelete.id}`,
-        {
-          method: 'DELETE',
-        },
-      );
-
-      if (response.ok) {
+      const delete_appointment_res = await deleteAppointment(appointmentToDelete.id, user_id);
+      if (delete_appointment_res.success) {
         return {
           success: true,
           message: `✅ Appointment "${appointmentToDelete.title}" deleted successfully!`,
         };
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete appointment');
+        const errorMessage = delete_appointment_res.error.message;
+        throw new Error(errorMessage || 'Failed to delete appointment');
       }
     } catch (error) {
       console.error('Delete appointment error:', error);

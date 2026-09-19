@@ -18,6 +18,7 @@ import {babySizes} from '../data/babySizes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable } from 'react-native';
 import { getProfile } from '../storage/profile';
+import { getAppointments } from '../storage/appointments';
 
 export default function HomeScreen({ navigation }) {
   console.log(BASE_URL);
@@ -68,12 +69,18 @@ export default function HomeScreen({ navigation }) {
         scrollToWeek(calculatedWeek);
       }
 
-      const apptRes = await fetch(
-        `${BASE_URL}/get_appointments?user_id=${user_id}`,
-      );
-      const apptData = await apptRes.json();
-      setAllAppointments(apptData || []);
+      try {
+        const appointments_response = await getAppointments(user_id);
+        const apptData = appointments_response.data;
+        if (!appointments_response.success) {
+          throw new Error(appointments_response.error.message);
+        }
 
+        setAllAppointments(apptData || []);
+      } catch (error) { 
+        console.log("Error while fetching appointments > HomeScreen.jsx:", error);
+      }
+      
       const taskRes = await fetch(`${BASE_URL}/get_tasks`);
       const taskData = await taskRes.json();
       setAllTasks(taskData || []);
@@ -121,9 +128,8 @@ export default function HomeScreen({ navigation }) {
       const weekNumber = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 7));
       return {...appt, week_number: weekNumber};
     })
-    .filter(appt => appt.week_number > currentWeek)
+    .filter(appt => appt.week_number === currentWeek)
     .sort((a, b) => a.week_number - b.week_number)
-    .slice(0, 2);
 
   const filteredTasks = allTasks
     .filter(task => parseInt(task.starting_week) >= currentWeek)

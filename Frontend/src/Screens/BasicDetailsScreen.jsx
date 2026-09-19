@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { countries } from '../data/countries';
-import { BASE_URL } from '@env';
 import { Calendar } from 'react-native-calendars';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createProfile } from '../storage/profile';
