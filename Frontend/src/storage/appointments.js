@@ -1,4 +1,5 @@
 import {openDB} from '../database';
+import NotificationService from '../services/NotificationService';
 import {success, failure} from '../utils/serviceResponse';
 
 /**
@@ -89,7 +90,7 @@ export async function addAppointment(data) {
       return failure('User profile not found', 'USER_PROFILE_NOT_FOUND');
     }
 
-    await db.execute(
+    const appointment_res = await db.execute(
       `
       INSERT INTO appointments (
         title,
@@ -111,6 +112,24 @@ export async function addAppointment(data) {
         'pending',
         userId,
       ],
+    );
+
+    const result = await db.execute('SELECT * FROM appointments WHERE id = ?', [
+      appointment_res.insertId,
+    ]);
+
+    // Notification send
+    const newAppointment = result.rows?._array[0];
+    NotificationService.showLocalNotification(
+      'Appointment Created',
+      `"${newAppointment.title}" scheduled for ${newAppointment.appointment_date} at ${newAppointment.appointment_time}.`,
+    );
+    NotificationService.scheduleAppointmentReminder(
+      newAppointment.title,
+      newAppointment.content,
+      newAppointment.appointment_date,
+      newAppointment.appointment_time,
+      newAppointment.id,
     );
 
     return success({
@@ -212,6 +231,20 @@ export async function updateAppointment(appointmentId, data) {
       ],
     );
 
+    // Notification
+    NotificationService.showLocalNotification(
+      'Appointment Updated',
+      `"${title}" rescheduled to ${appointmentDate} at ${appointmentTime}.`,
+    );
+    NotificationService.cancelNotification(appointmentId);
+    NotificationService.scheduleAppointmentReminder(
+      title,
+      content,
+      appointmentDate,
+      appointmentTime,
+      appointmentId,
+    );
+
     return success({
       status: 'success',
       message: 'Appointment updated successfully',
@@ -265,9 +298,7 @@ export async function deleteAppointment(appointmentId, userId) {
     }
 
     /*
-     * Only allow the user to delete their own appointment.
-     * Global appointments (user_id = 0) cannot be deleted
-     * by this function.
+     * Allow the user to delete their own appointment.
      */
     if (appointment.user_id !== parsedUserId) {
       return failure('Appointment entry not found', 'APPOINTMENT_NOT_FOUND');
@@ -280,6 +311,13 @@ export async function deleteAppointment(appointmentId, userId) {
       `,
       [parsedAppointmentId, parsedUserId],
     );
+
+    // Notification
+    NotificationService.showLocalNotification(
+      'Appointment Deleted',
+      `"${appointment?.title || 'Appointment'}" has been cancelled.`,
+    );
+    NotificationService.cancelNotification(appointmentId);
 
     return success({
       status: 'success',

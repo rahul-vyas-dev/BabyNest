@@ -216,7 +216,6 @@ const ScheduleScreen = ({route}) => {
         throw new Error(add_appointment_res.error.message);
       }
 
-      const data = add_appointment_res.data;
       if (add_appointment_res.success) {
         console.log('Success', 'Appointment created successfully!');
         setNewAppointment({
@@ -237,23 +236,6 @@ const ScheduleScreen = ({route}) => {
           topOffset: 50,
         });
         
-        // Notifications
-        NotificationService.showLocalNotification(
-          "Appointment Created",
-          `"${newAppointment.title}" scheduled for ${newAppointment.appointment_date} at ${newAppointment.appointment_time}.`
-        );
-
-        if (data && data.id) {
-        NotificationService.scheduleAppointmentReminder(
-          newAppointment.title,
-          newAppointment.content,
-          newAppointment.appointment_date,
-          newAppointment.appointment_time,
-          data.id
-        );
-      } else {
-        console.warn('[useCalendar] No ID returned from backend, skipping reminder schedule.');
-      }
       } 
     } catch (error) {
       Toast.show({
@@ -280,11 +262,6 @@ const ScheduleScreen = ({route}) => {
           topOffset: 50,
         });
         fetchAppointments();
-        NotificationService.showLocalNotification(
-          "Appointment Deleted", 
-          `"${selectedAppointment?.title || 'Appointment'}" has been cancelled.`
-        );
-        NotificationService.cancelNotification(id);
       } else {
         Toast.show({
           type: 'error',
@@ -326,21 +303,6 @@ const ScheduleScreen = ({route}) => {
           position: 'bottom',
           topOffset: 50,
         });
-        const fetchSuccess = fetchAppointments();
-        if (fetchSuccess) {
-          NotificationService.showLocalNotification(
-            "Appointment Updated", 
-            `"${editAppointment.title}" rescheduled to ${editAppointment.appointment_date} at ${editAppointment.appointment_time}.`
-          );
-          NotificationService.cancelNotification(editAppointment.id);
-          NotificationService.scheduleAppointmentReminder(
-              editAppointment.title, 
-              editAppointment.content, 
-              editAppointment.appointment_date, 
-              editAppointment.appointment_time, 
-              editAppointment.id
-          );
-      }
       } else {
         Toast.show({
           type: 'error',
