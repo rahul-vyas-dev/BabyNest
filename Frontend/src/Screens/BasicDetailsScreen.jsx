@@ -93,7 +93,7 @@ export default function BasicDetailsScreen() {
       // Store user_id in AsyncStorage
       await AsyncStorage.setItem('user_id', String(data.data.userId));
       // Navigate to DueDate screen with the due date
-      navigation.replace('DueDate', { dueDate: data.dueDate });
+      navigation.replace('DueDate', { dueDate: data.data.dueDate });
     }
   } catch (error) {
       console.error('Profile submission failed:', error);

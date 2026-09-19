@@ -21,7 +21,7 @@ export async function openDB() {
 
   // First-time database setup
   if (version === 0) {
-    await db.execute(SCHEMA);
+    await db.executeBatchAsync(SCHEMA);
 
     // Mark database as initialized
     await db.execute(`PRAGMA user_version = 1;`);

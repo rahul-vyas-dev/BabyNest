@@ -19,7 +19,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable } from 'react-native';
 import { getProfile } from '../storage/profile';
 
-export default function HomeScreen({navigation}) {
+export default function HomeScreen({ navigation }) {
+  console.log(BASE_URL);
   const [dueDate, setDueDate] = useState('');
   const [currentWeek, setCurrentWeek] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
