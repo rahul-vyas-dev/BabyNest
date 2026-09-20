@@ -8,6 +8,8 @@ import {BASE_URL} from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteProfile, updateProfile } from '../storage/profile';
 import { addAppointment, deleteAppointment, getAppointments, updateAppointment } from '../storage/appointments';
+import { addBPLog, getBPLogs } from '../storage/bloodPressure';
+import { generateResponse } from '../model/model';
 
 class RAGService {
   constructor() {
@@ -2016,20 +2018,20 @@ class RAGService {
       // Convert natural language dates and times to proper formats
       const properDate = this.convertToDate(data.date);
       const properTime = this.convertToTime(data.time);
-      
+
       console.log('📅 Converting appointment data:');
       console.log('Original date:', data.date, '→ Proper date:', properDate);
       console.log('Original time:', data.time, '→ Proper time:', properTime);
-      
-      const user_id = await AsyncStorage.getItem("user_id");
+
+      const user_id = await AsyncStorage.getItem('user_id');
       const add_appointment_res = await addAppointment({
-          title: data.title || 'Appointment',
-          content: `Appointment scheduled via chat`,
-          appointment_date: properDate,
-          appointment_time: properTime,
-          appointment_location: data.location || 'TBD',
-          user_id
-        });
+        title: data.title || 'Appointment',
+        content: `Appointment scheduled via chat`,
+        appointment_date: properDate,
+        appointment_time: properTime,
+        appointment_location: data.location || 'TBD',
+        user_id,
+      });
 
       if (!add_appointment_res.success) {
         throw new Error(add_appointment_res.error.message);
@@ -2133,19 +2135,16 @@ class RAGService {
    */
   async logBloodPressure(data, userContext) {
     try {
-      const response = await fetch(`${BASE_URL}/blood_pressure`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          systolic: data.systolic,
-          diastolic: data.diastolic,
-          week_number: data.week_number || userContext.current_week || 12,
-          time: data.time || new Date().toLocaleTimeString(),
-          note: data.note || '',
-        }),
+      const user_id = await AsyncStorage.getItem('user_id');
+      const addBPLog_response = await addBPLog(user_id, {
+        systolic: data.systolic,
+        diastolic: data.diastolic,
+        week_number: data.week_number || userContext.current_week || 12,
+        time: data.time || new Date().toLocaleTimeString(),
+        note: data.note || '',
       });
 
-      if (response.ok) {
+      if (addBPLog_response.success) {
         return {
           success: true,
           message: `🩸 Blood pressure ${data.systolic}/${
@@ -2157,7 +2156,9 @@ class RAGService {
           screen: 'bloodpressure',
         };
       } else {
-        throw new Error('Failed to log blood pressure');
+        throw new Error(
+          addBPLog_response.error.message || 'Failed to log blood pressure',
+        );
       }
     } catch (error) {
       return {
@@ -2346,7 +2347,7 @@ class RAGService {
    */
   async getData(data, userContext) {
     try {
-      const user_id = await AsyncStorage.getItem("user_id");
+      const user_id = await AsyncStorage.getItem('user_id');
       let endpoint = '';
       switch (data.type) {
         case 'appointments':
@@ -2376,7 +2377,7 @@ class RAGService {
 
       const response = await endpoint(user_id);
       if (response.success) {
-        const result = response.data;      
+        const result = response.data;
 
         // Format the data for display
         let formattedMessage = '';
@@ -2476,7 +2477,7 @@ class RAGService {
       if (!appointments_response.success) {
         throw new Error(appointments_response.error.message);
       }
-      
+
       const appointments = appointments_response.data;
       const matchingAppointments = this.findMatchingAppointments(
         appointments,
@@ -2526,7 +2527,10 @@ class RAGService {
         content: data.note || appointmentToUpdate.content,
       };
 
-      const update_appointment_res = await updateAppointment(appointmentToUpdate.id, updateData);
+      const update_appointment_res = await updateAppointment(
+        appointmentToUpdate.id,
+        updateData,
+      );
 
       if (update_appointment_res.success) {
         return {
@@ -2602,7 +2606,10 @@ class RAGService {
       // Single match - proceed with deletion
       const appointmentToDelete = matchingAppointments[0];
 
-      const delete_appointment_res = await deleteAppointment(appointmentToDelete.id, user_id);
+      const delete_appointment_res = await deleteAppointment(
+        appointmentToDelete.id,
+        user_id,
+      );
       if (delete_appointment_res.success) {
         return {
           success: true,
@@ -2775,7 +2782,7 @@ class RAGService {
           action: 'logout',
         };
       }
-      throw new Error(delete_user_res.error.message)
+      throw new Error(delete_user_res.error.message);
     } catch (error) {
       return {
         success: false,
@@ -2790,32 +2797,68 @@ class RAGService {
    */
   async handleGeneralChat(data, userContext) {
     try {
-      const response = await fetch(`${BASE_URL}/agent`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          query: data.query || '',
-          user_id: 'default',
-        }),
-      });
+      const query = data?.query?.trim() || '';
 
-      if (response.ok) {
-        const result = await response.json();
+      if (!query) {
         return {
           success: true,
           message:
-            result.response || "I'm here to help with your pregnancy journey!",
+            "I'm here to help with your pregnancy journey! What would you like to know?",
           action: 'generalChat',
+          intent: 'general_chat',
         };
-      } else {
-        throw new Error('Backend agent request failed');
       }
-    } catch (error) {
+
+      if (__DEV__) {
+        console.log('🤖 Handling general chat with local AI...');
+        console.log('Query:', query);
+      }
+
+      // Build a simple context-aware prompt for the local model
+      const prompt = `
+  You are BabyNest, a helpful pregnancy assistant.
+
+  The user's request did not match any specific app intent, so respond naturally.
+
+  User context:
+  ${JSON.stringify(userContext || {}, null, 2)}
+
+  User message:
+  ${query}
+
+  Instructions:
+  - Answer the user's question naturally and clearly.
+  - Use the provided user context when it is relevant.
+  - Do not pretend that an app action was performed.
+  - Do not invent medical information.
+  - If the question is unrelated to pregnancy, you can still answer normally.
+  - Keep the response concise and conversational.
+  `;
+
+      const response = await generateResponse([
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ]);
+
       return {
         success: true,
         message:
+          response ||
           "I'm here to help with your pregnancy journey! How can I assist you today?",
         action: 'generalChat',
+        intent: 'general_chat',
+      };
+    } catch (error) {
+      console.error('❌ General chat failed:', error);
+
+      return {
+        success: true,
+        message:
+          "I'm here to help with your pregnancy journey! Could you try asking your question another way?",
+        action: 'generalChat',
+        intent: 'general_chat',
       };
     }
   }
@@ -3522,9 +3565,10 @@ class RAGService {
    */
   async viewBloodPressureLogs(data, userContext) {
     try {
-      const response = await fetch(`${BASE_URL}/blood_pressure`);
-      if (response.ok) {
-        const logs = await response.json();
+      const user_id = await AsyncStorage.getItem('user_id');
+      const getBPLogs_response = await getBPLogs(user_id);
+      if (getBPLogs_response.success) {
+        const logs = getBPLogs_response.data;
 
         // Filter by week if specified
         let filteredLogs = logs;
@@ -3588,7 +3632,10 @@ class RAGService {
           data: filteredLogs,
         };
       } else {
-        throw new Error('Failed to fetch blood pressure logs');
+        throw new Error(
+          getBPLogs_response.error.message ||
+            'Failed to fetch blood pressure logs',
+        );
       }
     } catch (error) {
       return {
