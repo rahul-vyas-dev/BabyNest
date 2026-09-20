@@ -14,6 +14,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { Modal, Portal, Button, Provider } from 'react-native-paper'; // Import from paper
 import CustomHeader from '../Components/CustomHeader';
 import { BASE_URL } from '@env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const IconButton = ({ icon, label }) => {
   const { theme } = useTheme();
@@ -57,13 +58,14 @@ export default function SettingsScreen() {
 
   const fetchProfileData = async () => {
     try {
-      const response = await fetch(`${BASE_URL}/get_profile`);
+      const user_id = await AsyncStorage.getItem("user_id");
+      const response = await fetch(`${BASE_URL}/get_profile?user_id=${user_id}`);
       if (response.ok) {
         const data = await response.json();
         setProfileData({
-          name: data.name || 'Guest',
-          due_date: data.due_date || 'Not set',
-          location: data.location || 'Not set'
+          name: data.user_name || 'Guest',
+          due_date: data.dueDate || 'Not set',
+          location: data.user_location || 'Not set'
         });
       } else {
         // If profile not found, keep default values

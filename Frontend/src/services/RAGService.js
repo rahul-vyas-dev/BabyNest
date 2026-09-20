@@ -5,6 +5,7 @@
  */
 
 import {BASE_URL} from '@env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class RAGService {
   constructor() {
@@ -2345,10 +2346,11 @@ class RAGService {
    */
   async getData(data, userContext) {
     try {
+      const user_id = await AsyncStorage.getItem("user_id");
       let endpoint = '';
       switch (data.type) {
         case 'appointments':
-          endpoint = '/get_appointments';
+          endpoint = `/get_appointments?user_id=${user_id}`;
           break;
         case 'weight':
           endpoint = '/get_weight';

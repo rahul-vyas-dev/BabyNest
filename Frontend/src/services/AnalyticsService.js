@@ -4,6 +4,7 @@
  */
 
 import { BASE_URL } from '@env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class AnalyticsService {
   constructor() {
@@ -114,7 +115,9 @@ class AnalyticsService {
   /**
    * Get endpoint for specific metric
    */
-  getEndpointForMetric(metric) {
+  async getEndpointForMetric(metric) {
+    const user_id = await AsyncStorage.getItem("user_id");
+
     const endpoints = {
       weight: '/get_weight_entries',
       mood: '/get_mood_entries',
@@ -122,7 +125,7 @@ class AnalyticsService {
       symptoms: '/get_symptoms',
       blood_pressure: '/get_blood_pressure',
       medicine: '/get_medicine',
-      appointments: '/get_appointments',
+      appointments: `/get_appointments?user_id=${user_id}`,
       tasks: '/get_tasks'
     };
     
