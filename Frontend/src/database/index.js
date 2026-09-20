@@ -21,10 +21,25 @@ export async function openDB() {
 
   // First-time database setup
   if (version === 0) {
-    await db.executeBatchAsync(SCHEMA);
+    console.log('VERSION IS 0 → STARTING SCHEMA');
 
-    // Mark database as initialized
+    for (let i = 0; i < SCHEMA.length; i++) {
+      console.log(`Executing schema ${i}`);
+
+      try {
+        await db.execute(SCHEMA[i]);
+        console.log(`Schema ${i} SUCCESS`);
+      } catch (error) {
+        console.error(`Schema ${i} FAILED`);
+        console.error('SQL:', SCHEMA[i]);
+        console.error('ERROR:', error);
+        throw error;
+      }
+    }
+
+    console.log('SCHEMA FINISHED');
     await db.execute(`PRAGMA user_version = 1;`);
+    console.log('VERSION SET TO 1');
   }
 
   return db;

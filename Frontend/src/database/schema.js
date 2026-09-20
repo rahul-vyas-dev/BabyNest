@@ -2,8 +2,7 @@ export const SCHEMA = [
   // ─────────────────────────────────────────────
   // PROFILE
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       CREATE TABLE IF NOT EXISTS profile (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_name TEXT NOT NULL DEFAULT 'Guest',
@@ -16,25 +15,11 @@ export const SCHEMA = [
         dueDate TEXT
       );
     `,
-  },
-
-  // ─────────────────────────────────────────────
-  // SAMPLE PROFILE
-  // ─────────────────────────────────────────────
-  {
-    query: `
-      INSERT INTO profile
-        (id, lmp, cycleLength, periodLength, age, weight, user_location, user_name)
-      VALUES
-        (1, '2025-01-01', 28, 5, 30, 65, 'New York', 'John Doe');
-    `,
-  },
 
   // ─────────────────────────────────────────────
   // APPOINTMENTS
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       CREATE TABLE IF NOT EXISTS appointments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -49,13 +34,11 @@ export const SCHEMA = [
         FOREIGN KEY (user_id) REFERENCES profile(id)
       );
     `,
-  },
 
   // ─────────────────────────────────────────────
   // TASKS
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       CREATE TABLE IF NOT EXISTS tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -74,13 +57,11 @@ export const SCHEMA = [
         FOREIGN KEY (user_id) REFERENCES profile(id)
       );
     `,
-  },
 
   // ─────────────────────────────────────────────
   // BLOOD PRESSURE LOGS
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       CREATE TABLE IF NOT EXISTS blood_pressure_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -93,13 +74,11 @@ export const SCHEMA = [
         FOREIGN KEY (user_id) REFERENCES profile(id)
       );
     `,
-  },
 
   // ─────────────────────────────────────────────
   // DISCHARGE LOGS
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       CREATE TABLE IF NOT EXISTS discharge_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -112,13 +91,11 @@ export const SCHEMA = [
         FOREIGN KEY (user_id) REFERENCES profile(id)
       );
     `,
-  },
 
   // ─────────────────────────────────────────────
   // WEEKLY WEIGHT
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       CREATE TABLE IF NOT EXISTS weekly_weight (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -129,13 +106,11 @@ export const SCHEMA = [
         FOREIGN KEY (user_id) REFERENCES profile(id)
       );
     `,
-  },
 
   // ─────────────────────────────────────────────
   // WEEKLY MEDICINE
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       CREATE TABLE IF NOT EXISTS weekly_medicine (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -149,13 +124,11 @@ export const SCHEMA = [
         FOREIGN KEY (user_id) REFERENCES profile(id)
       );
     `,
-  },
 
   // ─────────────────────────────────────────────
   // WEEKLY SYMPTOMS
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       CREATE TABLE IF NOT EXISTS weekly_symptoms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -166,14 +139,12 @@ export const SCHEMA = [
         FOREIGN KEY (user_id) REFERENCES profile(id)
       );
     `,
-  },
 
   // ─────────────────────────────────────────────
   // SAMPLE TASKS
   // user_id = 1 → John Doe
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       INSERT INTO tasks
         (
           user_id,
@@ -259,13 +230,11 @@ export const SCHEMA = [
           'Last medical assessments before labor.',
           38, 40, 'high', FALSE, FALSE, 'pending');
     `,
-  },
 
   // ─────────────────────────────────────────────
   // SAMPLE WEEKLY WEIGHT
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       INSERT INTO weekly_weight
         (user_id, week_number, weight, note)
       VALUES
@@ -273,13 +242,11 @@ export const SCHEMA = [
         (1, 9, 60.9, 'Appetite increasing slightly'),
         (1, 10, 61.3, 'Started prenatal yoga, feeling good');
     `,
-  },
 
   // ─────────────────────────────────────────────
   // SAMPLE WEEKLY MEDICINE
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       INSERT INTO weekly_medicine
         (user_id, week_number, name, dose, time, taken, note)
       VALUES
@@ -292,13 +259,11 @@ export const SCHEMA = [
         (1, 10, 'Prenatal Vitamin', '1 tablet', '08:00', 1,
           'No side effects, continuing as normal');
     `,
-  },
 
   // ─────────────────────────────────────────────
   // SAMPLE WEEKLY SYMPTOMS
   // ─────────────────────────────────────────────
-  {
-    query: `
+  `
       INSERT INTO weekly_symptoms
         (user_id, week_number, symptom, note)
       VALUES
@@ -311,5 +276,4 @@ export const SCHEMA = [
         (1, 10, 'Frequent Urination',
           'Especially during the night');
     `,
-  },
 ];
